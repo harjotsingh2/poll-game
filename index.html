@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Travel Quiz Party — Realtime</title>
+  <title>Travel Quiz — Realtime</title>
   <!-- Tailwind (CDN build) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,7 +58,7 @@
     <header class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-2xl bg-white/10 grid place-items-center text-xl">🧭</div>
-        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Travel Quiz Party</h1>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Travel Quiz</h1>
       </div>
       <a class="btn-ghost" href="#howto">How it works</a>
     </header>
@@ -81,17 +81,349 @@
 
   // Sample Travel Qs
   const DEFAULT_QUESTIONS = [
-    { q: "What is the capital of Japan?", options: ["Seoul", "Tokyo", "Kyoto", "Osaka"], a: 1 },
-    { q: "Which country is home to Machu Picchu?", options: ["Peru", "Mexico", "Chile", "Bolivia"], a: 0 },
-    { q: "The city of Marrakech is in which country?", options: ["Morocco", "Tunisia", "Egypt", "Jordan"], a: 0 },
-    { q: "Which city is known as the 'City of Canals'?", options: ["Amsterdam", "Venice", "Bruges", "Bangkok"], a: 1 },
-    { q: "Mount Kilimanjaro is located in which country?", options: ["Kenya", "Tanzania", "Uganda", "Ethiopia"], a: 1 },
-    { q: "Which country has the Great Barrier Reef?", options: ["Australia", "Indonesia", "Philippines", "New Zealand"], a: 0 },
-    { q: "Which city has the airport code 'DXB'?", options: ["Doha", "Dubai", "Delhi", "Durban"], a: 1 },
-    { q: "The ancient city of Petra is in?", options: ["Israel", "Jordan", "Syria", "Lebanon"], a: 1 },
-    { q: "Which river runs through Paris?", options: ["Seine", "Thames", "Danube", "Rhine"], a: 0 },
-    { q: "What is the capital of Canada?", options: ["Toronto", "Vancouver", "Ottawa", "Montreal"], a: 2 },
+    {
+        "q": "What is the capital of Australia?",
+        "options": ["Sydney", "Canberra", "Melbourne", "Perth"],
+        "answer": 1
+    },
+    {
+        "q": "Which country is known as the Land of the Rising Sun?",
+        "options": ["China", "Thailand", "Japan", "South Korea"],
+        "answer": 2
+    },
+    {
+        "q": "Machu Picchu is located in which country?",
+        "options": ["Peru", "Chile", "Mexico", "Brazil"],
+        "answer": 0
+    },
+    {
+        "q": "Which desert covers much of northern Africa?",
+        "options": ["Gobi", "Sahara", "Kalahari", "Mojave"],
+        "answer": 1
+    },
+    {
+        "q": "What is the official language of Brazil?",
+        "options": ["Spanish", "Portuguese", "French", "English"],
+        "answer": 1
+    },
+    {
+        "q": "Which European city is famous for its canals and gondolas?",
+        "options": ["Amsterdam", "Venice", "Bruges", "Copenhagen"],
+        "answer": 1
+    },
+    {
+        "q": "Mount Kilimanjaro is located in which country?",
+        "options": ["Kenya", "Tanzania", "Uganda", "Ethiopia"],
+        "answer": 1
+    },
+    {
+        "q": "Which country has the most islands in the world?",
+        "options": ["Indonesia", "Sweden", "Philippines", "Norway"],
+        "answer": 1
+    },
+    {
+        "q": "What currency is used in Japan?",
+        "options": ["Yuan", "Won", "Yen", "Ringgit"],
+        "answer": 2
+    },
+    {
+        "q": "Which US state is home to the Grand Canyon?",
+        "options": ["Arizona", "Nevada", "Utah", "New Mexico"],
+        "answer": 0
+    },
+    {
+        "q": "Which city is known as the City of Love?",
+        "options": ["Rome", "Venice", "Paris", "Vienna"],
+        "answer": 2
+    },
+    {
+        "q": "Which African country is famous for pyramids?",
+        "options": ["Ethiopia", "Sudan", "Egypt", "Libya"],
+        "answer": 2
+    },
+    {
+        "q": "In which country would you find the city of Dubrovnik?",
+        "options": ["Croatia", "Slovenia", "Montenegro", "Serbia"],
+        "answer": 0
+    },
+    {
+        "q": "Which Asian city has a famous Merlion statue?",
+        "options": ["Bangkok", "Singapore", "Hong Kong", "Kuala Lumpur"],
+        "answer": 1
+    },
+    {
+        "q": "What is the tallest mountain in the world?",
+        "options": ["K2", "Mount Everest", "Kangchenjunga", "Makalu"],
+        "answer": 1
+    },
+    {
+        "q": "Which country is home to the Great Barrier Reef?",
+        "options": ["Fiji", "Australia", "New Zealand", "Indonesia"],
+        "answer": 1
+    },
+    {
+        "q": "Which European city is split by the River Danube?",
+        "options": ["Budapest", "Vienna", "Bratislava", "Belgrade"],
+        "answer": 0
+    },
+    {
+        "q": "The Taj Mahal was built in which country?",
+        "options": ["Pakistan", "India", "Bangladesh", "Nepal"],
+        "answer": 1
+    },
+    {
+        "q": "Which city is known as Big Apple?",
+        "options": ["Chicago", "New York City", "Los Angeles", "Boston"],
+        "answer": 1
+    },
+    {
+        "q": "In which country can you visit the ancient city of Petra?",
+        "options": ["Jordan", "Israel", "Turkey", "Lebanon"],
+        "answer": 0
+    },
+    {
+        "q": "Which country has the city of Marrakech?",
+        "options": ["Algeria", "Tunisia", "Morocco", "Egypt"],
+        "answer": 2
+    },
+    {
+        "q": "Which European country is famous for waffles and chocolate?",
+        "options": ["Switzerland", "Belgium", "France", "Netherlands"],
+        "answer": 1
+    },
+    {
+        "q": "The Great Wall of China was primarily built to protect against invasions from which direction?",
+        "options": ["South", "West", "East", "North"],
+        "answer": 3
+    },
+    {
+        "q": "Which capital city is built on 14 islands?",
+        "options": ["Stockholm", "Copenhagen", "Helsinki", "Oslo"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is famous for Oktoberfest?",
+        "options": ["Switzerland", "Austria", "Germany", "Poland"],
+        "answer": 2
+    },
+    {
+        "q": "Which city hosted the 2016 Summer Olympics?",
+        "options": ["Rio de Janeiro", "Tokyo", "Beijing", "London"],
+        "answer": 0
+    },
+    {
+        "q": "What is the capital of Canada?",
+        "options": ["Toronto", "Vancouver", "Montreal", "Ottawa"],
+        "answer": 3
+    },
+    {
+        "q": "In which country is the Angkor Wat temple complex?",
+        "options": ["Cambodia", "Thailand", "Myanmar", "Vietnam"],
+        "answer": 0
+    },
+    {
+        "q": "Which mountain range separates Europe and Asia?",
+        "options": ["Andes", "Ural", "Alps", "Caucasus"],
+        "answer": 1
+    },
+    {
+        "q": "Which desert is the largest hot desert in the world?",
+        "options": ["Sahara", "Gobi", "Arabian", "Kalahari"],
+        "answer": 0
+    },
+    {
+        "q": "What is the currency of Mexico?",
+        "options": ["Peso", "Real", "Dollar", "Colon"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is shaped like a boot?",
+        "options": ["Portugal", "Italy", "Spain", "Greece"],
+        "answer": 1
+    },
+    {
+        "q": "Which US state is closest to Russia?",
+        "options": ["Alaska", "Hawaii", "Washington", "California"],
+        "answer": 0
+    },
+    {
+        "q": "Which sea separates Saudi Arabia from Africa?",
+        "options": ["Red Sea", "Mediterranean", "Arabian Sea", "Caspian"],
+        "answer": 0
+    },
+    {
+        "q": "What is the capital of Thailand?",
+        "options": ["Phuket", "Chiang Mai", "Bangkok", "Ayutthaya"],
+        "answer": 2
+    },
+    {
+        "q": "Which country has the maple leaf on its flag?",
+        "options": ["Canada", "Denmark", "Switzerland", "Austria"],
+        "answer": 0
+    },
+    {
+        "q": "Which European country has a city called Bruges?",
+        "options": ["Belgium", "Netherlands", "Germany", "Luxembourg"],
+        "answer": 0
+    },
+    {
+        "q": "Which continent is known as the birthplace of humanity?",
+        "options": ["Asia", "Africa", "Europe", "South America"],
+        "answer": 1
+    },
+    {
+        "q": "Which Italian city is famous for its Leaning Tower?",
+        "options": ["Florence", "Pisa", "Rome", "Venice"],
+        "answer": 1
+    },
+    {
+        "q": "Which river flows through Egypt?",
+        "options": ["Amazon", "Yangtze", "Nile", "Danube"],
+        "answer": 2
+    },
+    {
+        "q": "Which Asian country was formerly known as Ceylon?",
+        "options": ["Maldives", "Sri Lanka", "Myanmar", "Laos"],
+        "answer": 1
+    },
+    {
+        "q": "What is the capital of Iceland?",
+        "options": ["Reykjavik", "Oslo", "Helsinki", "Copenhagen"],
+        "answer": 0
+    },
+    {
+        "q": "Which city has the famous Christ the Redeemer statue?",
+        "options": ["Rio de Janeiro", "Lisbon", "Barcelona", "Buenos Aires"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is famous for tulips and windmills?",
+        "options": ["Netherlands", "Belgium", "Denmark", "Germany"],
+        "answer": 0
+    },
+    {
+        "q": "Which US city is known as the Windy City?",
+        "options": ["New York", "Chicago", "Boston", "San Francisco"],
+        "answer": 1
+    },
+    {
+        "q": "Which Asian country is the largest by land area?",
+        "options": ["China", "India", "Russia", "Kazakhstan"],
+        "answer": 2
+    },
+    {
+        "q": "Which city is home to the Colosseum?",
+        "options": ["Athens", "Rome", "Istanbul", "Florence"],
+        "answer": 1
+    },
+    {
+        "q": "Which country is the smallest in the world by area?",
+        "options": ["Monaco", "San Marino", "Vatican City", "Liechtenstein"],
+        "answer": 2
+    },
+    {
+        "q": "Which country is home to the Serengeti National Park?",
+        "options": ["Kenya", "South Africa", "Tanzania", "Namibia"],
+        "answer": 2
+    },
+    {
+        "q": "Which city is famous for its Blue Mosque?",
+        "options": ["Cairo", "Istanbul", "Tehran", "Damascus"],
+        "answer": 1
+    },
+    {
+        "q": "Which country has both the highest and lowest points on Earth?",
+        "options": ["India", "Nepal", "China", "Pakistan"],
+        "answer": 2
+    },
+    {
+        "q": "What is the capital of Argentina?",
+        "options": ["Buenos Aires", "Santiago", "Lima", "Montevideo"],
+        "answer": 0
+    },
+    {
+        "q": "Which Asian city is known as the Pearl of the Orient?",
+        "options": ["Hong Kong", "Manila", "Shanghai", "Bangkok"],
+        "answer": 1
+    },
+    {
+        "q": "Which African country has Table Mountain?",
+        "options": ["Kenya", "South Africa", "Namibia", "Zimbabwe"],
+        "answer": 1
+    },
+    {
+        "q": "Which is the world’s largest country by land area?",
+        "options": ["Russia", "Canada", "China", "USA"],
+        "answer": 0
+    },
+    {
+        "q": "Which Middle Eastern city has the Burj Khalifa?",
+        "options": ["Riyadh", "Abu Dhabi", "Doha", "Dubai"],
+        "answer": 3
+    },
+    {
+        "q": "Which sea is the lowest point on Earth’s surface?",
+        "options": ["Dead Sea", "Caspian Sea", "Black Sea", "Red Sea"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is famous for the Galápagos Islands?",
+        "options": ["Peru", "Ecuador", "Chile", "Colombia"],
+        "answer": 1
+    },
+    {
+        "q": "Which desert covers much of Mongolia and northern China?",
+        "options": ["Gobi", "Taklamakan", "Karakum", "Thar"],
+        "answer": 0
+    },
+    {
+        "q": "Which Asian country is home to the city of Varanasi?",
+        "options": ["Nepal", "India", "Bangladesh", "Sri Lanka"],
+        "answer": 1
+    },
+    {
+        "q": "What is the capital of Spain?",
+        "options": ["Barcelona", "Madrid", "Valencia", "Seville"],
+        "answer": 1
+    },
+    {
+        "q": "Which European country is home to Transylvania?",
+        "options": ["Romania", "Hungary", "Bulgaria", "Serbia"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is home to the Amazon rainforest?",
+        "options": ["Brazil", "Peru", "Colombia", "Venezuela"],
+        "answer": 0
+    },
+    {
+        "q": "Which Asian city is home to Shibuya Crossing?",
+        "options": ["Seoul", "Shanghai", "Tokyo", "Taipei"],
+        "answer": 2
+    },
+    {
+        "q": "Which city is home to the Acropolis?",
+        "options": ["Athens", "Rome", "Istanbul", "Cairo"],
+        "answer": 0
+    },
+    {
+        "q": "Which country is famous for the city of Casablanca?",
+        "options": ["Egypt", "Morocco", "Spain", "Tunisia"],
+        "answer": 1
+    },
+    {
+        "q": "Which European city has a famous Atomium building?",
+        "options": ["Brussels", "Berlin", "Vienna", "Zurich"],
+        "answer": 0
+    },
+    {
+        "q": "Which island country is known as the Land Down Under?",
+        "options": ["New Zealand", "Australia", "Fiji", "Papua New Guinea"],
+        "answer": 1
+    }
   ];
+
+  
 
   // ======= GLOBAL STATE =======
   const S = {
