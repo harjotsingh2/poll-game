@@ -22,7 +22,7 @@
   </style>
   <script type="module" id="firebase-sdk">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getDatabase, ref, set, onValue, update, get, child } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    import { getDatabase, ref, set, onValue, update, get } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
     import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const firebaseConfig = {
@@ -39,7 +39,7 @@
     const db = getDatabase(app);
     const auth = getAuth(app);
 
-    window.$fb = { db, auth, ref, set, onValue, update, get, child, signInAnonymously };
+    window.$fb = { db, auth, ref, set, onValue, update, get, signInAnonymously };
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -415,8 +415,11 @@
     role: null,
     room: null,
     questions: JSON.parse(localStorage.getItem('tqp_questions') || 'null') || DEFAULT_QUESTIONS,
-    settings: JSON.parse(localStorage.getItem('tqp_settings') || 'null') || { perQuestionSec: 20, pointsCorrect: 100, pointsFastestBonus: 20, shuffle: true }
+    settings: JSON.parse(localStorage.getItem('tqp_settings') || 'null') || { perQuestionSec: 20, pointsCorrect: 100, pointsFastestBonus: 20, shuffle: true },
+    myScore: 0
   };
+
+  const RC = { questions: null };
 
   function saveLocal() {
     localStorage.setItem('tqp_questions', JSON.stringify(S.questions));
@@ -603,15 +606,18 @@
 
   function editQuestions() { Screens.edit(); }
 
+  function r(path) { return window.$fb.ref(window.$fb.db, path); }
+  function roomRef(room) { return r(`rooms/${room}`); }
+  function playersRef(room) { return r(`rooms/${room}/players`); }
+  function playerRef(room, uid) { return r(`rooms/${room}/players/${uid}`); }
+  function stateRef(room) { return r(`rooms/${room}/state`); }
+  function questionsRef(room) { return r(`rooms/${room}/questions`); }
+
   async function ensureAuth() {
     const { auth, signInAnonymously } = window.$fb;
     if (!auth.currentUser) await signInAnonymously(auth).catch(err => alert('Auth error: ' + err.message));
     return auth.currentUser;
   }
-
-  function roomRef(room) { return window.$fb.ref(window.$fb.db, `rooms/${room}`); }
-  function playersRef(room) { return window.$fb.ref(window.$fb.db, `rooms/${room}/players`); }
-  function stateRef(room) { return window.$fb.ref(window.$fb.db, `rooms/${room}/state`); }
 
   async function hostFlow() {
     await ensureAuth();
@@ -623,6 +629,7 @@
       questions: S.questions,
       state: { status: 'lobby', qIndex: -1, endAt: 0, paused: false, remainingSec: null, fastestAwarded: false }
     });
+    subscribeQuestions(S.room);
     Screens.host(S.room);
     history.replaceState({}, '', location.pathname + `?host=${S.room}`);
   }
@@ -640,9 +647,20 @@
     S.room = room;
 
     await window.$fb.update(playersRef(room), { [S.me.uid]: { name: S.me.name, score: 0, joinedAt: Date.now(), lastQ: -1 }});
+    subscribeQuestions(room);
+    subscribeMyScore(room);
     Screens.player(room);
     saveLocal();
     history.replaceState({}, '', location.pathname + `?join=${room}`);
+  }
+
+  function subscribeQuestions(room) {
+    window.$fb.onValue(questionsRef(room), snap => { RC.questions = snap.val(); });
+  }
+
+  function subscribeMyScore(room) {
+    if (!S.me.uid) return;
+    window.$fb.onValue(playerRef(room, S.me.uid), snap => { const v = snap.val(); if (v) S.myScore = v.score||0; });
   }
 
   async function startRound(room) {
@@ -651,15 +669,13 @@
   }
 
   async function nextQuestion(room) {
-    const game = await window.$fb.get(roomRef(room));
-    const data = game.val();
-    const total = (data.questions || []).length;
-    let i = (data.state?.qIndex ?? -1) + 1;
-    if (S.settings.shuffle && i === 0) {
-      const shuf = shuffle(data.questions);
-      await window.$fb.update(roomRef(room), { questions: shuf });
-    }
-    if (i >= total) { await endRound(room); return; }
+    const stSnap = await window.$fb.get(stateRef(room));
+    const st = stSnap.val() || {};
+    let i = (st.qIndex ?? -1) + 1;
+    const qsSnap = await window.$fb.get(questionsRef(room));
+    let qs = qsSnap.val() || [];
+    if (S.settings.shuffle && i === 0) { qs = shuffle(qs); await window.$fb.update(roomRef(room), { questions: qs }); }
+    if (i >= qs.length) { await endRound(room); return; }
     const endAt = Date.now() + (S.settings.perQuestionSec * 1000);
     await window.$fb.update(stateRef(room), { status: 'question', qIndex: i, endAt, paused: false, remainingSec: null, fastestAwarded: false });
     const playersSnap = await window.$fb.get(playersRef(room));
@@ -670,6 +686,7 @@
   }
 
   async function endRound(room) { await window.$fb.update(stateRef(room), { status: 'ended' }); }
+
   async function resetScores(room) {
     const playersSnap = await window.$fb.get(playersRef(room));
     const players = playersSnap.val() || {};
@@ -690,9 +707,7 @@
     const stSnap = await window.$fb.get(stateRef(room));
     const st = stSnap.val();
     if (!st || st.status !== 'question') return;
-    const left = (st.paused && typeof st.remainingSec === 'number')
-      ? st.remainingSec
-      : Math.max(0, Math.ceil((st.endAt - Date.now())/1000));
+    const left = (st.paused && typeof st.remainingSec === 'number') ? st.remainingSec : Math.max(0, Math.ceil((st.endAt - Date.now())/1000));
     const endAt = Date.now() + left * 1000;
     await window.$fb.update(stateRef(room), { paused: false, endAt, remainingSec: null });
   }
@@ -705,27 +720,26 @@
   }
 
   async function submitAnswer(room, idx) {
-    const gameSnap = await window.$fb.get(roomRef(room));
-    const g = gameSnap.val();
-    const q = g.questions[g.state.qIndex];
+    const stSnap = await window.$fb.get(stateRef(room));
+    const st = stSnap.val();
+    if (!st || st.status !== 'question') return;
+    const qIdx = st.qIndex;
+    const q = (RC.questions || [])[qIdx];
+    if (!q) return;
     const correct = idx === q.a;
     const now = Date.now();
-
-    const pSnap = await window.$fb.get(window.$fb.ref(window.$fb.db, `rooms/${room}/players/${S.me.uid}`));
+    const pSnap = await window.$fb.get(playerRef(room, S.me.uid));
     const me = pSnap.val();
-    if (me?.lastQ === g.state.qIndex) return;
-
-    await window.$fb.update(window.$fb.ref(window.$fb.db, `rooms/${room}/players/${S.me.uid}`), { lastAnswer: idx, lastCorrect: correct, lastTs: now, lastQ: g.state.qIndex });
-
+    if (me?.lastQ === qIdx) return;
+    const updates = { lastAnswer: idx, lastCorrect: correct, lastTs: now, lastQ: qIdx };
     if (correct) {
       let bonus = 0;
-      if (!g.state.fastestAwarded) {
-        bonus = S.settings.pointsFastestBonus;
-        await window.$fb.update(stateRef(room), { fastestAwarded: true });
-      }
-      const add = S.settings.pointsCorrect + bonus;
-      await window.$fb.update(window.$fb.ref(window.$fb.db, `rooms/${room}/players/${S.me.uid}`), { score: (me?.score||0) + add });
+      const stSnap2 = await window.$fb.get(stateRef(room));
+      const st2 = stSnap2.val();
+      if (st2 && !st2.fastestAwarded) { bonus = S.settings.pointsFastestBonus; await window.$fb.update(stateRef(room), { fastestAwarded: true }); }
+      updates.score = (me?.score||0) + S.settings.pointsCorrect + bonus;
     }
+    await window.$fb.update(playerRef(room, S.me.uid), updates);
   }
 
   function renderLeaderboard(el, players) {
@@ -756,43 +770,45 @@
   }
 
   function renderHostListeners(room) {
+    let lbTimer = null;
     window.$fb.onValue(playersRef(room), snap => {
       const players = snap.val() || {};
       const el = $('#players');
       el.innerHTML = Object.values(players).map(p => `<div class="flex items-center justify-between bg-white/5 rounded-xl px-3 py-2"><div>${p.name}</div><div class="mono text-sm text-slate-300/80">${p.score||0}</div></div>`).join('');
-      renderLeaderboard($('#leaderboard'), players);
+      if (lbTimer) return;
+      lbTimer = setTimeout(() => { renderLeaderboard($('#leaderboard'), players); lbTimer = null; }, 300);
     });
 
     let curState = null;
     let timerInt = null;
-    window.$fb.onValue(stateRef(room), async snap => {
+    let shownTimesUp = false;
+    window.$fb.onValue(stateRef(room), snap => {
       curState = snap.val();
       if (!curState) return;
-      const roomSnap = await window.$fb.get(roomRef(room));
-      const g = roomSnap.val();
-
-      if (curState.status === 'question') {
-        const q = g.questions[curState.qIndex];
+      const q = (RC.questions || [])[curState.qIndex];
+      if (curState.status === 'question' && q) {
         $('#questionBox').textContent = q.q;
         renderOptions($('#optionsBox'), q, true, () => {});
+        shownTimesUp = false;
         clearInterval(timerInt);
         timerInt = setInterval(() => {
           const s = curState;
-          const left = s.paused
-            ? (typeof s.remainingSec === 'number' ? s.remainingSec : Math.max(0, Math.ceil((s.endAt - Date.now())/1000)))
-            : Math.max(0, Math.ceil((s.endAt - Date.now())/1000));
+          const left = s.paused ? (typeof s.remainingSec === 'number' ? s.remainingSec : Math.max(0, Math.ceil((s.endAt - Date.now())/1000))) : Math.max(0, Math.ceil((s.endAt - Date.now())/1000));
           $('#timeLeft').textContent = left;
-          if (!s.paused && left <= 0) {
+          if (!s.paused && left <= 0 && !shownTimesUp) {
+            shownTimesUp = true;
             clearInterval(timerInt);
             $('#timeLeft').textContent = '0';
             const opts = $$('#optionsBox button');
             opts.forEach((b, i) => { if (i === q.a) b.classList.add('outline','outline-2','outline-green-500/60'); });
-            const msg = document.createElement('div');
-            msg.className = 'text-sm text-slate-300/70 mt-2';
-            msg.textContent = "Time's up! Host: click 'Next Question' to continue.";
-            $('#optionsBox').appendChild(msg);
+            if (!$('#optionsBox .timesup')) {
+              const msg = document.createElement('div');
+              msg.className = 'text-sm text-slate-300/70 mt-2 timesup';
+              msg.textContent = "Time's up! Host: click 'Next Question' to continue.";
+              $('#optionsBox').appendChild(msg);
+            }
           }
-        }, 200);
+        }, 250);
       } else if (curState.status === 'ended') {
         clearInterval(timerInt);
         $('#timeLeft').textContent = '—';
@@ -807,17 +823,19 @@
   }
 
   function renderPlayerListeners(room) {
-    window.$fb.onValue(playersRef(room), snap => renderLeaderboard($('#pLeaderboard'), snap.val() || {}));
+    let lbTimer = null;
+    window.$fb.onValue(playersRef(room), snap => {
+      const players = snap.val() || {};
+      if (lbTimer) return; lbTimer = setTimeout(() => { renderLeaderboard($('#pLeaderboard'), players); lbTimer = null; }, 300);
+    });
 
     let curState = null;
     let ticking = null;
-    window.$fb.onValue(stateRef(room), async snap => {
+    window.$fb.onValue(stateRef(room), snap => {
       curState = snap.val();
       if (!curState) return;
-      const g = (await window.$fb.get(roomRef(room))).val();
-
-      if (curState.status === 'question') {
-        const q = g.questions[curState.qIndex];
+      const q = (RC.questions || [])[curState.qIndex];
+      if (curState.status === 'question' && q) {
         $('#pStatus').textContent = `Answer fast! ${S.settings.pointsCorrect} pts + ${S.settings.pointsFastestBonus} bonus for fastest correct.`;
         $('#pQuestion').textContent = q.q;
         let answered = false;
@@ -830,11 +848,9 @@
         clearInterval(ticking);
         ticking = setInterval(() => {
           const s = curState;
-          const left = s.paused
-            ? (typeof s.remainingSec === 'number' ? s.remainingSec : Math.max(0, Math.ceil((s.endAt - Date.now())/1000)))
-            : Math.max(0, Math.ceil((s.endAt - Date.now())/1000));
+          const left = s.paused ? (typeof s.remainingSec === 'number' ? s.remainingSec : Math.max(0, Math.ceil((s.endAt - Date.now())/1000))) : Math.max(0, Math.ceil((s.endAt - Date.now())/1000));
           if (!s.paused && left <= 0) { clearInterval(ticking); $('#pStatus').textContent = 'Time!'; }
-        }, 200);
+        }, 250);
       } else if (curState.status === 'ended') {
         $('#pStatus').textContent = 'Round ended. Ask the host to start a new round!';
         $('#pQuestion').textContent = '';
@@ -853,19 +869,15 @@
     const joinCode = params.get('join');
 
     if (hostCode) {
-      S.role = 'host'; S.room = hostCode; Screens.host(hostCode);
+      S.role = 'host'; S.room = hostCode; subscribeQuestions(hostCode); Screens.host(hostCode);
     } else if (joinCode) {
-      if (!S.me.name) {
-        const n = prompt('Enter your name'); if (!n) { Screens.home(); return; } S.me.name = n; saveLocal();
-      }
+      if (!S.me.name) { const n = prompt('Enter your name'); if (!n) { Screens.home(); return; } S.me.name = n; saveLocal(); }
       joinFlow(joinCode, S.me.name);
     } else {
       Screens.home();
     }
 
-    if (params.get('test') === '1') {
-      setTimeout(runTests, 30);
-    }
+    if (params.get('test') === '1') { setTimeout(runTests, 30); }
   }
 
   window.addEventListener('load', init);
@@ -877,39 +889,17 @@
 
     try { assert(typeof editQuestions === 'function', 'editQuestions should be defined'); push('editQuestions exists', true); } catch(e){ push('editQuestions exists', false, e.message); }
 
-    try {
-      const c = code();
-      if (!/^[1-9][0-9]{5}$/.test(c)) throw new Error('bad format');
-      push('room code format', true);
-    } catch(e) { push('room code format', false, e.message); }
+    try { const c = code(); if (!/^[1-9][0-9]{5}$/.test(c)) throw new Error('bad format'); push('room code format', true); }
+    catch(e) { push('room code format', false, e.message); }
 
-    try {
-      const arr = [1,2,3,4,5];
-      const sh = shuffle(arr);
-      if (!(arr.length === sh.length)) throw new Error('length');
-      if (!arr.every(v => sh.includes(v))) throw new Error('elements');
-      push('shuffle preserves elements', true);
-    } catch(e) { push('shuffle preserves elements', false, e.message); }
+    try { const arr = [1,2,3,4,5]; const sh = shuffle(arr); if (!(arr.length === sh.length)) throw new Error('length'); if (!arr.every(v => sh.includes(v))) throw new Error('elements'); push('shuffle preserves elements', true); }
+    catch(e) { push('shuffle preserves elements', false, e.message); }
 
-    try {
-      const el = document.createElement('div');
-      renderOptions(el, { options: ['A','B','C','D'] }, false, () => {});
-      if (el.children.length !== 4) throw new Error('count');
-      push('renderOptions count', true);
-    } catch(e) { push('renderOptions count', false, e.message); }
+    try { const el = document.createElement('div'); renderOptions(el, { options: ['A','B','C','D'] }, false, () => {}); if (el.children.length !== 4) throw new Error('count'); push('renderOptions count', true); }
+    catch(e) { push('renderOptions count', false, e.message); }
 
-    try {
-      const el = document.createElement('div');
-      const players = {
-        a: { name:'Ann', score:120, lastTs: 5, lastCorrect:true },
-        b: { name:'Bob', score:200, lastTs: 3, lastCorrect:false },
-        c: { name:'Cat', score:120, lastTs: 2, lastCorrect:false }
-      };
-      renderLeaderboard(el, players);
-      const first = el.querySelector('.font-semibold')?.textContent;
-      if (first !== 'Bob') throw new Error('order');
-      push('leaderboard sorting', true);
-    } catch(e) { push('leaderboard sorting', false, e.message); }
+    try { const el = document.createElement('div'); const players = { a:{name:'Ann',score:120,lastTs:5,lastCorrect:true}, b:{name:'Bob',score:200,lastTs:3,lastCorrect:false}, c:{name:'Cat',score:120,lastTs:2,lastCorrect:false} }; renderLeaderboard(el, players); const first = el.querySelector('.font-semibold')?.textContent; if (first !== 'Bob') throw new Error('order'); push('leaderboard sorting', true); }
+    catch(e) { push('leaderboard sorting', false, e.message); }
 
     try { if (typeof startTimer !== 'function') throw new Error('missing'); push('startTimer exists', true); } catch(e) { push('startTimer exists', false, e.message); }
     try { if (typeof stopTimer !== 'function') throw new Error('missing'); push('stopTimer exists', true); } catch(e) { push('stopTimer exists', false, e.message); }
@@ -917,10 +907,7 @@
     const panel = document.createElement('div');
     panel.className = 'fixed bottom-4 right-4 max-w-sm p-4 rounded-2xl glass text-sm';
     panel.innerHTML = `<div class="font-semibold mb-1">Self-tests</div>` +
-      results.map(r => `<div class="flex items-start gap-2 ${r.pass? 'text-green-400':'text-red-400'}">
-        <div>${r.pass? '✔':'✖'}</div>
-        <div>${r.name}${r.pass? '': ` — ${r.err}`}</div>
-      </div>`).join('');
+      results.map(r => `<div class="flex items-start gap-2 ${r.pass? 'text-green-400':'text-red-400'}">\n        <div>${r.pass? '✔':'✖'}</div>\n        <div>${r.name}${r.pass? '': ` — ${r.err}`}</div>\n      </div>`).join('');
     document.body.appendChild(panel);
 
     console.table(results);
